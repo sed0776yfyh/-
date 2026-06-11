@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Полёт Котят</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+        canvas {
+            border: 2px solid #333;
+            background: radial-gradient(circle at center, #1a0505 0%, #000000 100%);
+            cursor: none;
+            box-shadow: 0 0 50px rgba(255, 100, 100, 0.1);
+        }
+        
+        /* Интерфейс */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .top-bar {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: auto;
+        }
+
+        .stats-box {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        h1 { 
+            margin: 0; 
+            font-size: 20px; 
+            color: #aaa; 
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+        
+        #timer {
+            font-size: 40px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 15px rgba(255,255,255,0.3);
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .coin-display {
+            font-size: 24px;
+            color: #FFD700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            pointer-events: auto;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .btn-shop { background: #333; color: white; border: 1px solid #555; }
+        .btn-shop:hover { background: #444; }
+        
+        .btn-promo { background: #2c3e50; color: #3498db; border: 1px solid #3498db; }
+        .btn-promo:hover { background: #34495e; }
+
+        .btn-primary {
+            background: #ff4757;
+            color: white;
+            box-shadow: 0 0 15px rgba(255, 71, 87, 0.4);
+            font-size: 20px;
+            padding: 15px 40px;
+        }
+        .btn-primary:hover { transform: scale(1.05); background: #ff6b81; }
+
+        /* Экраны меню */
+        .screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: auto;
+            background: rgba(10, 10, 10, 0.95);
+            padding: 40px;
+            border-radius: 15px;
+            border: 1px solid #333;
+            backdrop-filter: blur(5px);
+            display: none;
+            min-width: 300px;
+        }
+
+        .screen.active { display: block; }
+
+        #gameOverScreen h2 { color: #ff4757; font-size: 36px; margin-top: 0; }
+        .earnings { font-size: 24px; color: #FFD700; margin: 20px 0; }
+
+        /* Магазин */
+        #shopScreen { width: 500px; max-height: 80vh; overflow-y: auto; }
+        .skins-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .skin-item {
+            background: #222; padding: 15px; border-radius: 8px; cursor: pointer;
+            border: 2px solid transparent; transition: 0.2s;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .skin-item:hover { background: #333; }
+        .skin-item.selected { border-color: #00ff00; background: #1a331a; }
+        .skin-preview {
+            width: 30px; height: 40px; border-radius: 50%; margin-bottom: 10px;
+            box-shadow: 0 0 10px currentColor; position: relative;
+        }
+        /* Ниточка шарика в превью */
+        .skin-preview::after {
+            content: ''; position: absolute; bottom: -10px; left: 50%;
+            width: 1px; height: 10px; background: white; transform: translateX(-50%);
+        }
+
+        /* Промокод */
+        #promoInput {
+            padding: 10px; font-size: 18px; width: 80%; text-align: center;
+            background: #222; border: 1px solid #555; color: white; margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        #promoMsg { height: 20px; font-size: 14px; margin-top: 5px; }
+        .success { color: #00ff00; }
+        .error { color: #ff4757; }
+
+    </style>
+</head>
+<body>
+
+    <div class="ui-layer">
+        <div class="top-bar">
+            <div>
+                <h1>Осторожно, Котята!</h1>
+            </div>
+            <div class="stats-box">
+                <div class="coin-display">🪙 <span id="uiCoins">0</span></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn-promo" onclick="openPromo()">💌 Промокод</button>
+                    <button class="btn-shop" onclick="openShop()">🛒 Магазин</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="timer">0.00</div>
+    </div>
+
+    <!-- Game Over -->
+    <div id="gameOverScreen" class="screen">
+        <h2>ШАРИК ЛОПНУЛ! 💥</h2>
+        <p>Злые котята поймали тебя.</p>
+        <div id="finalTime" style="font-size: 40px; font-weight: bold; margin: 10px 0;">0.00</div>
+        <div class="earnings">+<span id="earnedCoins">0</span> монет</div>
+        <button class="btn-primary" onclick="startGame()">ИГРАТЬ СНОВА</button>
+    </div>
+
+    <!-- Магазин -->
+    <div id="shopScreen" class="screen">
+        <h2 style="margin-top: 0;">МАГАЗИН ШАРИКОВ</h2>
+        <div class="coin-display" style="justify-content: center; margin-bottom: 15px;">Баланс: <span id="shopCoins">0</span> 🪙</div>
+        <div class="skins-grid" id="skinsList"></div>
+        <button style="margin-top: 20px; background: #555; color: white;" onclick="closeShop()">Закрыть</button>
+    </div>
+
+    <!-- Промокод -->
+    <div id="promoScreen" class="screen">
+        <h2 style="margin-top: 0;">ВВЕДИ КОД</h2>
+        <input type="text" id="promoInput" placeholder="КОД ЗДЕСЬ">
+        <button class="btn-primary" style="font-size: 16px; padding: 10px 20px;" onclick="checkPromo()">Активировать</button>
+        <div id="promoMsg"></div>
+        <button style="margin-top: 15px; background: transparent; color: #aaa; border: none;" onclick="closePromo()">Отмена</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.width = 600;
+    canvas.height = 800;
+
+    // --- ДАННЫЕ ИГРЫ ---
+    let coins = parseInt(localStorage.getItem('gameCoins')) || 0;
+    let ownedSkins = JSON.parse(localStorage.getItem('ownedSkins')) || [1];
+    let selectedSkinId = parseInt(localStorage.getItem('selectedSkin')) || 1;
+    let usedPromos = JSON.parse(localStorage.getItem('usedPromos')) || [];
+
+    // Скины (Цвета шариков)
+    const skinsConfig = [
+        { id: 1, name: "Классика", price: 0, color: "#ff4757", glow: "#ff6b81" },
+        { id: 2, name: "Неон", price: 100, color: "#2ed573", glow: "#7bed9f" },
+        { id: 3, name: "Золото", price: 200, color: "#ffa502", glow: "#eccc68" },
+        { id: 4, name: "Океан", price: 300, color: "#1e90ff", glow: "#70a1ff" },
+        { id: 5, name: "Лёд", price: 400, color: "#dfe4ea", glow: "#ffffff" },
+        { id: 6, name: "Лава", price: 500, color: "#ff4757", glow: "#ff0000" },
+        { id: 7, name: "Фиолет", price: 600, color: "#5352ed", glow: "#a29bfe" },
+        { id: 8, name: "Кибер", price: 700, color: "#00d2d3", glow: "#01a3a4" },
+        { id: 9, name: "Тьма", price: 800, color: "#2f3542", glow: "#57606f" },
+        { id: 10, name: "Радуга", price: 900, color: "rainbow", glow: "#ffffff" }
+    ];
+
+    // Враги (Котята)
+    const catFaces = ["😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾"];
+
+    let isPlaying = false;
+    let elapsedTime = 0;
+    let lastTime = 0;
+    let animationId;
+    
+    const player = { x: 300, y: 650, radius: 15, visible: true };
+    let obstacles = [];
+    let particles = []; 
+    let bgSymbols = [];
+
+    // Фон (Китайские иероглифы)
+    const chineseChars = "道天地玄黄宇宙洪荒日月盈昃辰宿列张";
+    function initBackground() {
+        bgSymbols = [];
+        for(let i=0; i<40; i++) {
+            bgSymbols.push({
+                char: chineseChars[Math.floor(Math.random() * chineseChars.length)],
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: 20 + Math.random() * 60,
+                opacity: 0.05 + Math.random() * 0.15,
+                speed: 0.2 + Math.random() * 0.5
+            });
+        }
+    }
+
+    function updateUI() {
+        document.getElementById('uiCoins').innerText = coins;
+        document.getElementById('shopCoins').innerText = coins;
+    }
+    updateUI();
+
+    // Управление
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isPlaying) return;
+        const rect = canvas.getBoundingClientRect();
+        player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, e.clientX - rect.left));
+    });
+    canvas.addEventListener('touchmove', (e) => {
+        if (!isPlaying) return;
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, e.touches[0].clientX - rect.left));
+    }, { passive: false });
+
+    function startGame() {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        
+        obstacles = [];
+        particles = [];
+        player.x = 300;
+        player.visible = true;
+        elapsedTime = 0;
+        lastTime = performance.now();
+        isPlaying = true;
+        
+        cancelAnimationFrame(animationId);
+        loop(lastTime);
+    }
+
+    function gameOver() {
+        isPlaying = false;
+        player.visible = false;
+        
+        const earned = Math.floor(elapsedTime);
+        coins += earned;
+        
+        localStorage.setItem('gameCoins', coins);
+        updateUI();
+
+        document.getElementById('finalTime').innerText = elapsedTime.toFixed(2) + " сек";
+        document.getElementById('earnedCoins').innerText = earned;
+        document.getElementById('gameOverScreen').classList.add('active');
+        
+        createExplosion(player.x, player.y, '#ff4757');
+    }
+
+    // --- МАГАЗИН ---
+    function openShop() {
+        renderShop();
+        document.getElementById('shopScreen').classList.add('active');
+    }
+    function closeShop() { document.getElementById('shopScreen').classList.remove('active'); }
+
+    function renderShop() {
+        const list = document.getElementById('skinsList');
+        list.innerHTML = '';
+        
+        skinsConfig.forEach(skin => {
+            const isOwned = ownedSkins.includes(skin.id);
+            const isSelected = selectedSkinId === skin.id;
+            
+            const div = document.createElement('div');
+            div.className = `skin-item ${isSelected ? 'selected' : ''} ${!isOwned ? 'locked' : ''}`;
+            
+            let btnText = '';
+            if (isSelected) btnText = '<span style="color:#00ff00">ВЫБРАНО</span>';
+            else if (isOwned) btnText = '<span style="color:white">ВЫБРАТЬ</span>';
+            else btnText = `<span style="color:#FFD700">КУПИТЬ</span>`;
+
+            // Градиент для радужного скина
+            let bgStyle = `background: ${skin.color}; box-shadow: 0 0 15px ${skin.glow}`;
+            if(skin.color === 'rainbow') bgStyle = `background: linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet); box-shadow: 0 0 15px white`;
+
+            div.innerHTML = `
+                <div class="skin-preview" style="${bgStyle}"></div>
+                <div style="font-weight:bold">${skin.name}</div>
+                <div style="font-size: 12px; color: #aaa; margin-top: 5px;">${isOwned ? 'Куплено' : skin.price + ' 🪙'}</div>
+                ${btnText}
+            `;
+            
+            div.onclick = () => handleSkinClick(skin);
+            list.appendChild(div);
+        });
+    }
+
+    function handleSkinClick(skin) {
+        if (ownedSkins.includes(skin.id)) {
+            selectedSkinId = skin.id;
+            localStorage.setItem('selectedSkin', selectedSkinId);
+            renderShop();
+        } else {
+            if (coins >= skin.price) {
+                coins -= skin.price;
+                ownedSkins.push(skin.id);
+                selectedSkinId = skin.id;
+                
+                localStorage.setItem('gameCoins', coins);
+                localStorage.setItem('ownedSkins', JSON.stringify(ownedSkins));
+                localStorage.setItem('selectedSkin', selectedSkinId);
+                
+                updateUI();
+                renderShop();
+            } else {
+                alert("Недостаточно монет!");
+            }
+        }
+    }
+
+    // --- ПРОМОКОДЫ ---
+    function openPromo() { document.getElementById('promoScreen').classList.add('active'); }
+    function closePromo() { 
+        document.getElementById('promoScreen').classList.remove('active'); 
+        document.getElementById('promoMsg').innerText = "";
+        document.getElementById('promoInput').value = "";
+    }
+
+    function checkPromo() {
+        const input = document.getElementById('promoInput').value.trim().toUpperCase();
+        const msg = document.getElementById('promoMsg');
+        
+        const rewards = {
+            "KITTY": 500,
+            "MEOW": 200,
+            "BALLOON": 1000,
+            "ADMIN": 9999
+        };
+
+        if (usedPromos.includes(input)) {
+            msg.innerText = "Этот код уже использован!";
+            msg.className = "error";
+            return;
+        }
+
+        if (rewards[input]) {
+            coins += rewards[input];
+            usedPromos.push(input);
+            
+            localStorage.setItem('gameCoins', coins);
+            localStorage.setItem('usedPromos', JSON.stringify(usedPromos));
+            
+            updateUI();
+            msg.innerText = `Успех! Получено ${rewards[input]} монет!`;
+            msg.className = "success";
+            setTimeout(closePromo, 1500);
+        } else {
+            msg.innerText = "Неверный код";
+            msg.className = "error";
+        }
+    }
+
+    // --- ИГРОВАЯ ЛОГИКА ---
+    function spawnObstacle() {
+        obstacles.push({
+            x: Math.random() * (canvas.width - 50),
+            y: -60,
+            face: catFaces[Math.floor(Math.random() * catFaces.length)],
+            size: 40 + Math.random() * 20,
+            baseSpeed: 4 + Math.random() * 3
+        });
+    }
+
+    function createExplosion(x, y, color) {
+        for(let i=0; i<30; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 15,
+                vy: (Math.random() - 0.5) * 15,
+                life: 1.0,
+                color: color
+            });
+        }
+    }
+
+    function update(dt) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+            if(p.life <= 0) particles.splice(i, 1);
+        }
+
+        for(let sym of bgSymbols) {
+            sym.y += sym.speed;
+            if(sym.y > canvas.height + 50) sym.y = -50;
+        }
+
+        if (!isPlaying) return;
+
+        elapsedTime += dt / 1000;
+        document.getElementById('timer').innerText = elapsedTime.toFixed(2);
+
+        // Спавн котят
+        if (Math.random() < 0.02 + (elapsedTime * 0.001)) spawnObstacle();
+
+        let speedMult = 1 + (elapsedTime / 20);
+        
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            let obs = obstacles[i];
+            obs.y += obs.baseSpeed * speedMult * (dt / 16);
+
+            // Коллизия (хитбокс чуть меньше мордочки)
+            let dist = Math.hypot(player.x - (obs.x + obs.size/2), player.y - (obs.y + obs.size/2));
+            if (dist < (obs.size/2.5 + player.radius)) {
+                gameOver();
+            }
+
+            if (obs.y > canvas.height) obstacles.splice(i, 1);
+        }
+    }
+
+    function drawBalloon(x, y, r, color, glow) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // Ниточка
+        ctx.beginPath();
+        ctx.moveTo(0, r);
+        ctx.quadraticCurveTo(5, r + 20, 0, r + 40);
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Шар
+        ctx.beginPath();
+        // Немного сплюснутый овал
+        ctx.ellipse(0, 0, r, r * 1.15, 0, 0, Math.PI * 2);
+        
+        if (color === 'rainbow') {
+            const grad = ctx.createLinearGradient(-r, -r, r, r);
+            grad.addColorStop(0, 'red');
+            grad.addColorStop(0.2, 'orange');
+            grad.addColorStop(0.4, 'yellow');
+            grad.addColorStop(0.6, 'green');
+            grad.addColorStop(0.8, 'blue');
+            grad.addColorStop(1, 'violet');
+            ctx.fillStyle = grad;
+        } else {
+            ctx.fillStyle = color;
+        }
+        
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = glow;
+        ctx.fill();
+        
+        // Блик
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.ellipse(-r*0.3, -r*0.3, r*0.2, r*0.1, Math.PI/4, 0, Math.PI*2);
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.fill();
+        
+        ctx.restore();
+    }
+
+    function draw() {
+        ctx.fillStyle = '#050505';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Фон
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for(let sym of bgSymbols) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${sym.opacity})`;
+            ctx.font = `${sym.size}px serif`;
+            ctx.fillText(sym.char, sym.x, sym.y);
+        }
+
+        // Игрок (Шарик)
+        if (player.visible) {
+            const currentSkin = skinsConfig.find(s => s.id === selectedSkinId) || skinsConfig[0];
+            drawBalloon(player.x, player.y, player.radius, currentSkin.color, currentSkin.glow);
+        }
+
+        // Частицы
+        for (let p of particles) {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Враги (Котята)
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ff0000';
+        for (let obs of obstacles) {
+            ctx.font = `${obs.size}px serif`;
+            ctx.fillText(obs.face, obs.x + obs.size/2, obs.y + obs.size/2);
+        }
+        ctx.shadowBlur = 0;
+    }
+
+    function loop(timestamp) {
+        let dt = timestamp - lastTime;
+        lastTime = timestamp;
+        update(dt);
+        draw();
+        if (isPlaying || particles.length > 0) animationId = requestAnimationFrame(loop);
+    }
+
+    initBackground();
+    // Показать начальный экран
+    document.getElementById('gameOverScreen').querySelector('h2').innerText = "ГОТОВ?";
+    document.getElementById('gameOverScreen').querySelector('p').innerText = "Лети вверх, избегай злых котят!";
+    document.getElementById('finalTime').style.display = 'none';
+    document.getElementById('earnedCoins').parentElement.style.display = 'none';
+    document.getElementById('gameOverScreen').classList.add('active');
+
+</script>
+</body>
+</html>
